@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ActivationCodeModel {
   final String id;
   final String title; // M3U Extractor
@@ -25,6 +27,13 @@ class ActivationCodeModel {
     this.usedByUserId,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   factory ActivationCodeModel.fromJson(Map<String, dynamic> json) {
     return ActivationCodeModel(
       id: json['id'] ?? '',
@@ -35,12 +44,8 @@ class ActivationCodeModel {
       password: json['password'] ?? '',
       userStatus: json['user_status'] ?? 'inactive',
       isUsed: json['is_used'] ?? false,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
-      usedAt: json['used_at'] != null
-          ? DateTime.parse(json['used_at'])
-          : null,
+      createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
+      usedAt: _parseDate(json['used_at']),
       usedByUserId: json['used_by_user_id'],
     );
   }

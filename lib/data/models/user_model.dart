@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class WebUserModel {
   final String id;
   final String title;
@@ -29,6 +31,13 @@ class WebUserModel {
     this.lastLogin,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   factory WebUserModel.fromJson(Map<String, dynamic> json) {
     return WebUserModel(
       id: json['id'] ?? '',
@@ -41,15 +50,9 @@ class WebUserModel {
       dnsId: json['dns_id'] ?? '',
       deviceManager: json['device_key'],
       subscriptionType: json['subscription_type'],
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
-      expiryDate: json['expiry_date'] != null
-          ? DateTime.parse(json['expiry_date'])
-          : null,
-      lastLogin: json['last_login'] != null
-          ? DateTime.parse(json['last_login'])
-          : null,
+      createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
+      expiryDate: _parseDate(json['expiry_date']),
+      lastLogin: _parseDate(json['last_login']),
     );
   }
 

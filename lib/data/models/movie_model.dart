@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class MovieModel {
   final String id;
   final String title;
@@ -19,6 +21,13 @@ class MovieModel {
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   factory MovieModel.fromJson(Map<String, dynamic> json) {
     String rawUrl = json['imageUrl'] ?? json['image_url'] ?? json['poster'] ?? '';
     // Clean URL: remove whitespace and any quotes that might have been added by mistake
@@ -32,9 +41,7 @@ class MovieModel {
       category: json['category'] ?? json['genre'],
       year: json['year']?.toString() ?? json['release_date'],
       rating: json['rating']?.toString() ?? json['vote_average']?.toString(),
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
+      createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
     );
   }
 

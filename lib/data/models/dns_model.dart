@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class DnsModel {
   final String id;
   final String title;
@@ -17,6 +19,13 @@ class DnsModel {
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   factory DnsModel.fromJson(Map<String, dynamic> json) {
     return DnsModel(
       id: json['id'] ?? '',
@@ -25,9 +34,7 @@ class DnsModel {
       username: json['username'] ?? '',
       password: json['password'] ?? '',
       isActive: json['is_active'] ?? true,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
+      createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
     );
   }
 

@@ -12,24 +12,7 @@ class UsersRepository {
     return _firestore.collection(_collection).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
-        return WebUserModel(
-          id: data['id'] ?? doc.id,
-          title: data['title'] ?? '',
-          macAddress: data['mac_address'] ?? '',
-          username: data['username'] ?? '',
-          email: data['email'],
-          password: data['password'],
-          isProtected: data['is_protected'] ?? false,
-          dnsId: data['dns_id'] ?? '1',
-          deviceManager: data['device_key'],
-          subscriptionType: data['subscription_type'],
-          createdAt: data['created_at'] != null
-              ? DateTime.parse(data['created_at'])
-              : DateTime.now(),
-          expiryDate: data['expiry_date'] != null
-              ? DateTime.parse(data['expiry_date'])
-              : null,
-        );
+        return WebUserModel.fromJson({...data, 'id': data['id'] ?? doc.id});
       }).toList();
     });
   }
@@ -40,24 +23,7 @@ class UsersRepository {
       final snapshot = await _firestore.collection(_collection).get();
       return snapshot.docs.map((doc) {
         final data = doc.data();
-        return WebUserModel(
-          id: data['id'] ?? doc.id,
-          title: data['title'] ?? '',
-          macAddress: data['mac_address'] ?? '',
-          username: data['username'] ?? '',
-          email: data['email'],
-          password: data['password'],
-          isProtected: data['is_protected'] ?? false,
-          dnsId: data['dns_id'] ?? '1',
-          deviceManager: data['device_key'],
-          subscriptionType: data['subscription_type'],
-          createdAt: data['created_at'] != null
-              ? DateTime.parse(data['created_at'])
-              : DateTime.now(),
-          expiryDate: data['expiry_date'] != null
-              ? DateTime.parse(data['expiry_date'])
-              : null,
-        );
+        return WebUserModel.fromJson({...data, 'id': data['id'] ?? doc.id});
       }).toList();
     } catch (e) {
       print('Error getting users: $e');
