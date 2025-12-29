@@ -96,6 +96,7 @@ class _ActivationCodesPageState extends State<ActivationCodesPage> {
     final dnsController = TextEditingController();
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
+    final emailController = TextEditingController();
     
     String selectedStatus = 'active'; // Default per image/logic (Active or NotUsed which usually means active but not yet redeemed? Model has 'userStatus'. I'll use 'active' default)
     // Image shows "NotUsed" in a box. It might be a status 'inactive' or just 'not_used'. 
@@ -237,6 +238,19 @@ class _ActivationCodesPageState extends State<ActivationCodesPage> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Email
+                  const Text('Email (Optional)', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter email',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // User Status
                   const Text('User status', style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 8),
@@ -317,6 +331,7 @@ class _ActivationCodesPageState extends State<ActivationCodesPage> {
                           dnsId: finalDnsId,
                           username: usernameController.text.trim(),
                           password: passwordController.text.trim(),
+                          email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
                           userStatus: selectedStatus,
                         );
 
@@ -401,6 +416,7 @@ class _ActivationCodesPageState extends State<ActivationCodesPage> {
                           DataColumn(label: Text('Code')),
                           DataColumn(label: Text('M3U Extractor')),
                           DataColumn(label: Text('DNS')),
+                          DataColumn(label: Text('Username/Email')),
                           DataColumn(label: Text('Status')),
                           DataColumn(label: Text('Used')),
                           DataColumn(label: Text('Created')),
@@ -430,6 +446,20 @@ class _ActivationCodesPageState extends State<ActivationCodesPage> {
                             ),
                             DataCell(Text(code.title.isEmpty ? 'N/A' : code.title)),
                             DataCell(Text(dns.dnsAddress)),
+                            DataCell(Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (code.username.isNotEmpty) Text(code.username),
+                                if (code.email != null && code.email!.isNotEmpty)
+                                  Text(
+                                    code.email!,
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                if (code.username.isEmpty && (code.email == null || code.email!.isEmpty))
+                                  const Text('N/A'),
+                              ],
+                            )),
                             DataCell(
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

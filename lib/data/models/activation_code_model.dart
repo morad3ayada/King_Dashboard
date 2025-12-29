@@ -8,6 +8,7 @@ class ActivationCodeModel {
   final String username;
   final String password;
   final String userStatus; // 'active', 'inactive', 'trial'
+  final String? email; // Optional email
   final bool isUsed;
   final DateTime createdAt;
   final DateTime? usedAt;
@@ -21,6 +22,7 @@ class ActivationCodeModel {
     this.username = '',
     this.password = '',
     required this.userStatus,
+    this.email,
     this.isUsed = false,
     DateTime? createdAt,
     this.usedAt,
@@ -43,6 +45,7 @@ class ActivationCodeModel {
       username: json['username'] ?? '',
       password: json['password'] ?? '',
       userStatus: json['user_status'] ?? 'inactive',
+      email: json['email'],
       isUsed: json['is_used'] ?? false,
       createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
       usedAt: _parseDate(json['used_at']),
@@ -59,6 +62,7 @@ class ActivationCodeModel {
       'username': username,
       'password': password,
       'user_status': userStatus,
+      'email': email,
       'is_used': isUsed,
       'created_at': createdAt.toIso8601String(),
       'used_at': usedAt?.toIso8601String(),
@@ -74,6 +78,7 @@ class ActivationCodeModel {
     String? username,
     String? password,
     String? userStatus,
+    String? email,
     bool? isUsed,
     DateTime? createdAt,
     DateTime? usedAt,
@@ -87,6 +92,7 @@ class ActivationCodeModel {
       username: username ?? this.username,
       password: password ?? this.password,
       userStatus: userStatus ?? this.userStatus,
+      email: email ?? this.email,
       isUsed: isUsed ?? this.isUsed,
       createdAt: createdAt ?? this.createdAt,
       usedAt: usedAt ?? this.usedAt,
