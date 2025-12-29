@@ -349,7 +349,8 @@ class _UsersPageState extends State<UsersPage> {
                               
                               // DNS
                               String dns = '$scheme://$host';
-                              if (port != 0 && port != 80 && port != 443) {
+                              // Always include port to ensure compatibility with all players
+                              if (port != 0) {
                                 dns += ':$port';
                               }
                               dnsController.text = dns;
