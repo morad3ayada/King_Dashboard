@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import '../../data/models/admin_user_model.dart';
 
 class SharedStorageService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -114,16 +115,26 @@ class SharedStorageService {
     }
   }
 
-  Future<bool> verifyAdminPassword(String username, String password) async {
+  Future<AdminUser?> loginAdmin(String username, String password) async {
     try {
-      final admin = await getAdminByUsername(username);
-      if (admin == null) return false;
+      final snapshot = await _firestore
+          .collection('admins')
+          .where('username', isEqualTo: username)
+          .limit(1)
+          .get();
       
+      if (snapshot.docs.isEmpty) return null;
+      
+      final data = snapshot.docs.first.data();
       final hashedPassword = _hashPassword(password);
-      return admin['password'] == hashedPassword;
+      
+      if (data['password'] == hashedPassword) {
+        return AdminUser.fromJson(data);
+      }
+      return null;
     } catch (e) {
-      print('Error verifying admin password: $e');
-      return false;
+      print('Error logging in admin: $e');
+      return null;
     }
   }
 
@@ -139,10 +150,12 @@ class SharedStorageService {
       // Create default admin
       final adminData = {
         'id': 'admin_001',
+        'name': 'Super Admin',
         'username': 'admin',
         'password': _hashPassword('admin123'),
         'email': 'admin@kingiptv.com',
-        'role': 'super_admin',
+        'permissions': [], // Super admin doesn't need explicit permissions
+        'is_super_admin': true,
         'created_at': DateTime.now().toIso8601String(),
         'last_login': null,
       };

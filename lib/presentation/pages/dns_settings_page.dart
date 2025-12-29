@@ -29,9 +29,8 @@ class _DnsSettingsPageState extends State<DnsSettingsPage> {
   }
 
   Future<void> _showAddEditDialog({DnsModel? dns}) async {
+    final titleController = TextEditingController(text: dns?.title ?? '');
     final dnsController = TextEditingController(text: dns?.dnsAddress ?? '');
-    final userController = TextEditingController(text: dns?.username ?? '');
-    final passController = TextEditingController(text: dns?.password ?? '');
     final formKey = GlobalKey<FormState>();
 
     await showDialog(
@@ -46,24 +45,20 @@ class _DnsSettingsPageState extends State<DnsSettingsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
-                  controller: dnsController,
+                  controller: titleController,
                   decoration: const InputDecoration(
-                    labelText: 'DNS Address',
-                    hintText: 'http://example.com:8080',
+                    labelText: 'Title',
+                    hintText: 'My DNS Server',
                   ),
                   validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: userController,
-                  decoration: const InputDecoration(labelText: 'Username'),
-                  validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: passController,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
+                  controller: dnsController,
+                  decoration: const InputDecoration(
+                    labelText: 'DNS Address',
+                    hintText: 'http://example.com:8080',
+                  ),
                   validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                 ),
               ],
@@ -80,9 +75,10 @@ class _DnsSettingsPageState extends State<DnsSettingsPage> {
               if (formKey.currentState!.validate()) {
                 final newDns = DnsModel(
                   id: dns?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  title: titleController.text,
                   dnsAddress: dnsController.text,
-                  username: userController.text,
-                  password: passController.text,
+                  username: '',
+                  password: '',
                 );
 
                 bool success;
@@ -159,18 +155,16 @@ class _DnsSettingsPageState extends State<DnsSettingsPage> {
                       scrollDirection: Axis.horizontal,
                       child: DataTable(
                         columns: const [
+                          DataColumn(label: Text('Title')),
                           DataColumn(label: Text('DNS Address')),
-                          DataColumn(label: Text('Username')),
-                          DataColumn(label: Text('Password')),
                           DataColumn(label: Text('Status')),
                           DataColumn(label: Text('Created')),
                           DataColumn(label: Text('Actions')),
                         ],
                         rows: _dnsList.map((dns) {
                           return DataRow(cells: [
+                            DataCell(Text(dns.title.isNotEmpty ? dns.title : '-')),
                             DataCell(Text(dns.dnsAddress)),
-                            DataCell(Text(dns.username)),
-                            DataCell(Text('•' * dns.password.length)),
                             DataCell(
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

@@ -1,62 +1,37 @@
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/activation_code_model.dart';
-import '../services/web_api_service.dart';
-import '../../../core/services/shared_storage_service.dart';
 
 class ActivationRepository {
-  final _api = WebApiService();
-  final _sharedStorage = SharedStorageService();
+  final _firestore = FirebaseFirestore.instance;
+  final String _collection = 'activation_codes';
 
   Future<List<ActivationCodeModel>> getAllCodes() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    // Get codes from shared storage
-    final codesData = await _sharedStorage.getActivationCodes();
-    
-    return codesData.map((codeData) {
-      return ActivationCodeModel(
-        id: codeData['id'] ?? '',
-        code: codeData['code'] ?? '',
-        dnsId: codeData['dns_id'] ?? '',
-        userStatus: codeData['user_status'] ?? 'inactive',
-        isUsed: codeData['is_used'] ?? false,
-        createdAt: codeData['created_at'] != null
-            ? DateTime.parse(codeData['created_at'])
-            : DateTime.now(),
-        usedAt: codeData['used_at'] != null
-            ? DateTime.parse(codeData['used_at'])
-            : null,
-        usedByUserId: codeData['used_by_user_id'],
-      );
-    }).toList();
-  }
-
-  Future<List<ActivationCodeModel>> searchCodes(String query) async {
-    final allCodes = await getAllCodes();
-    await Future.delayed(const Duration(milliseconds: 200));
-    
-    return allCodes.where((code) {
-      return code.code.toLowerCase().contains(query.toLowerCase());
-    }).toList();
+    try {
+      final snapshot = await _firestore.collection(_collection).orderBy('created_at', descending: true).get();
+      return snapshot.docs.map((doc) => ActivationCodeModel.fromJson(doc.data())).toList();
+    } catch (e) {
+      print('Error fetching codes: $e');
+      return [];
+    }
   }
 
   Future<ActivationCodeModel?> addCode(ActivationCodeModel code) async {
     try {
-      await _api.post('/activation/generate', code.toJson());
-      await _sharedStorage.saveActivationCode(code.toJson());
-      
+      await _firestore.collection(_collection).doc(code.id).set(code.toJson());
       return code;
     } catch (e) {
+      print('Error adding code: $e');
       return null;
     }
   }
 
   Future<bool> deleteCode(String id) async {
     try {
-      await _api.delete('/activation/delete/$id');
-      await _sharedStorage.deleteActivationCode(id);
+      await _firestore.collection(_collection).doc(id).delete();
       return true;
     } catch (e) {
+      print('Error deleting code: $e');
       return false;
     }
   }
@@ -65,7 +40,12 @@ class ActivationRepository {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();
     final year = DateTime.now().year;
-    final randomPart = List.generate(6, (index) => chars[random.nextInt(chars.length)]).join();
-    return 'KING-$year-$randomPart';
+    // Generate 8 random characters to match the style in image "980376a8" or keep "KING-YYYY-XXXXXX" if user prefers. 
+    // The user image shows "980376a8". Let's generate a hex-like string of 8 chars.
+    // Or just hex string.
+    // I will stick to a random hex string of length 8 as shown in the placeholder/example.
+    // Example in image: "980376a8" => 8 chars hex.
+    const hexChars = '0123456789abcdef';
+    return List.generate(8, (index) => hexChars[random.nextInt(hexChars.length)]).join();
   }
 }

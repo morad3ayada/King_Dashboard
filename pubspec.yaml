@@ -20,6 +20,8 @@ dependencies:
   
   # Utilities
   crypto: ^3.0.3
+  file_picker: ^8.1.6
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

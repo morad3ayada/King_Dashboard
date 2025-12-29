@@ -1,5 +1,6 @@
 class DnsModel {
   final String id;
+  final String title;
   final String dnsAddress;
   final String username;
   final String password;
@@ -8,9 +9,10 @@ class DnsModel {
 
   DnsModel({
     required this.id,
+    this.title = '',
     required this.dnsAddress,
-    required this.username,
-    required this.password,
+    this.username = '',
+    this.password = '',
     this.isActive = true,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -18,6 +20,7 @@ class DnsModel {
   factory DnsModel.fromJson(Map<String, dynamic> json) {
     return DnsModel(
       id: json['id'] ?? '',
+      title: json['title'] ?? '',
       dnsAddress: json['dns_address'] ?? '',
       username: json['username'] ?? '',
       password: json['password'] ?? '',
@@ -31,6 +34,7 @@ class DnsModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'title': title,
       'dns_address': dnsAddress,
       'username': username,
       'password': password,
@@ -41,6 +45,7 @@ class DnsModel {
 
   DnsModel copyWith({
     String? id,
+    String? title,
     String? dnsAddress,
     String? username,
     String? password,
@@ -49,6 +54,7 @@ class DnsModel {
   }) {
     return DnsModel(
       id: id ?? this.id,
+      title: title ?? this.title,
       dnsAddress: dnsAddress ?? this.dnsAddress,
       username: username ?? this.username,
       password: password ?? this.password,

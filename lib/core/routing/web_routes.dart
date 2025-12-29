@@ -8,4 +8,5 @@ class WebRoutes {
   static const String users = '/users';
   static const String activationCodes = '/activation-codes';
   static const String sportSettings = '/sports';
+  static const String imageList = '/images';
 }

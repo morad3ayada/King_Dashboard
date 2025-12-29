@@ -11,6 +11,7 @@ class WebUserModel {
   final String? subscriptionType; // Subscription type: active, inactive, trial, etc.
   final DateTime createdAt;
   final DateTime? expiryDate;
+  final DateTime? lastLogin;
 
   WebUserModel({
     required this.id,
@@ -25,6 +26,7 @@ class WebUserModel {
     this.subscriptionType,
     DateTime? createdAt,
     this.expiryDate,
+    this.lastLogin,
   }) : createdAt = createdAt ?? DateTime.now();
 
   factory WebUserModel.fromJson(Map<String, dynamic> json) {
@@ -45,6 +47,9 @@ class WebUserModel {
       expiryDate: json['expiry_date'] != null
           ? DateTime.parse(json['expiry_date'])
           : null,
+      lastLogin: json['last_login'] != null
+          ? DateTime.parse(json['last_login'])
+          : null,
     );
   }
 
@@ -54,14 +59,15 @@ class WebUserModel {
       'title': title,
       'mac_address': macAddress,
       'username': username,
-      if (email != null) 'email': email,
-      if (password != null) 'password': password,
+      'email': email,
+      'password': password,
       'is_protected': isProtected,
       'dns_id': dnsId,
-      if (deviceManager != null) 'device_key': deviceManager,
-      if (subscriptionType != null) 'subscription_type': subscriptionType,
+      'device_key': deviceManager,
+      'subscription_type': subscriptionType,
       'created_at': createdAt.toIso8601String(),
       'expiry_date': expiryDate?.toIso8601String(),
+      'last_login': lastLogin?.toIso8601String(),
     };
   }
 
@@ -78,6 +84,7 @@ class WebUserModel {
     String? subscriptionType,
     DateTime? createdAt,
     DateTime? expiryDate,
+    DateTime? lastLogin,
   }) {
     return WebUserModel(
       id: id ?? this.id,
@@ -92,6 +99,7 @@ class WebUserModel {
       subscriptionType: subscriptionType ?? this.subscriptionType,
       createdAt: createdAt ?? this.createdAt,
       expiryDate: expiryDate ?? this.expiryDate,
+      lastLogin: lastLogin ?? this.lastLogin,
     );
   }
 }

@@ -24,17 +24,21 @@ class _WebLoginPageState extends State<WebLoginPage> {
     
     try {
       // Verify credentials with Firebase
-      final isValid = await _storageService.verifyAdminPassword(
+      final user = await _storageService.loginAdmin(
         _usernameController.text,
         _passwordController.text,
       );
       
-      if (isValid) {
+      if (user != null) {
         // Update last login
-        await _storageService.updateAdminLastLogin(_usernameController.text);
+        await _storageService.updateAdminLastLogin(user.username);
         
         if (mounted) {
-          Navigator.pushReplacementNamed(context, WebRoutes.dashboard);
+          Navigator.pushReplacementNamed(
+            context, 
+            WebRoutes.dashboard,
+            arguments: user,
+          );
         }
       } else {
         setState(() => _isLoading = false);
@@ -48,8 +52,8 @@ class _WebLoginPageState extends State<WebLoginPage> {
         }
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Login error: $e'),

@@ -91,22 +91,24 @@ class _ActivationCodesPageState extends State<ActivationCodesPage> {
     final dnsList = await _dnsRepo.getAllDns();
     setState(() => _isLoading = false);
 
-    if (dnsList.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please add a DNS server first in DNS Settings')),
-        );
-      }
-      return;
-    }
-
-    final titleController = TextEditingController();
+    final m3uController = TextEditingController();
     final codeController = TextEditingController(text: _repo.generateRandomCodeString());
+    final dnsController = TextEditingController();
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
     
-    String selectedDnsId = dnsList.first.id;
-    String selectedStatus = 'active';
+    String selectedStatus = 'active'; // Default per image/logic (Active or NotUsed which usually means active but not yet redeemed? Model has 'userStatus'. I'll use 'active' default)
+    // Image shows "NotUsed" in a box. It might be a status 'inactive' or just 'not_used'. 
+    // Existing values in dropdown were: active, inactive, trial.
+    // If I look at the image "User status": "NotUsed".
+    // I will add "NotUsed" as an option or map 'inactive' to it? 
+    // The previous code had 'active', 'inactive', 'trial'.
+    // I will stick to these technical values but display them nicely. 
+    // Or maybe the user wants a text field?
+    // The image shows a grey box "NotUsed", looks disabled?
+    // usually activation codes created are "active" (ready to be used) but "not used" yet.
+    // The model has `isUsed` boolean and `userStatus` string.
+    // I'll keep the Dropdown for flexibility but default to 'active'. 
 
     if (!mounted) return;
 
@@ -114,139 +116,237 @@ class _ActivationCodesPageState extends State<ActivationCodesPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Add Activation Code'),
+          contentPadding: const EdgeInsets.all(24),
           content: SingleChildScrollView(
             child: SizedBox(
               width: 500,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. M3U Extractor (Title)
+                  // M3U Extractor
+                   const Text(
+                    'M3U Extractor',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: m3uController,
+                          decoration: const InputDecoration(
+                            hintText: 'https://example.com/get.php?username=...',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          final url = m3uController.text.trim();
+                          if (url.isNotEmpty) {
+                            try {
+                              final uri = Uri.parse(url);
+                              final scheme = uri.scheme;
+                              final host = uri.host;
+                              final port = uri.port;
+                              
+                              String dns = '$scheme://$host';
+                              if (port != 0 && port != 80 && port != 443) {
+                                dns += ':$port';
+                              }
+                              dnsController.text = dns;
+
+                              final params = uri.queryParameters;
+                              if (params.containsKey('username')) {
+                                usernameController.text = params['username']!;
+                              }
+                              if (params.containsKey('password')) {
+                                passwordController.text = params['password']!;
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Invalid URL format')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.download),
+                        label: const Text('Extract'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00C853),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Activation code
+                  const Text('Activation code', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 8),
                   TextField(
-                    controller: titleController,
+                    controller: codeController,
                     decoration: const InputDecoration(
-                      labelText: 'M3U Extractor',
-                      hintText: 'Enter title',
+                      hintText: 'Enter code',
                       border: OutlineInputBorder(),
+                      isDense: true,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  // 2. Activation Code
+
+                  // DNS
+                  const Text('DNS', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 8),
                   TextField(
-                    controller: codeController,
-                    decoration: InputDecoration(
-                      labelText: 'Activation Code',
-                      hintText: 'Enter or generate code',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () {
-                          codeController.text = _repo.generateRandomCodeString();
+                    controller: dnsController,
+                    decoration: const InputDecoration(
+                      hintText: 'http://domain.com:port',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Username
+                  const Text('Username', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter username',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Password
+                  const Text('Password', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter password',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // User Status
+                  const Text('User status', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedStatus,
+                        isExpanded: true,
+                        items: const [
+                          DropdownMenuItem(value: 'active', child: Text('Active')),
+                          DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                          DropdownMenuItem(value: 'trial', child: Text('Trial')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedStatus = val);
                         },
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // 3. DNS (Dropdown)
-                  DropdownButtonFormField<String>(
-                    value: selectedDnsId,
-                    decoration: const InputDecoration(
-                      labelText: 'DNS',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: dnsList.map((dns) {
-                      return DropdownMenuItem(
-                        value: dns.id,
-                        child: Text(dns.dnsAddress),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => selectedDnsId = val);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 4. Username
-                  TextField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      hintText: 'Enter username',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 5. Password
-                  TextField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      hintText: 'Enter password',
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 16),
                   
-                  // User Status
-                  DropdownButtonFormField<String>(
-                    value: selectedStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'Status',
-                      border: OutlineInputBorder(),
+                  const SizedBox(height: 24),
+                  
+                  // Submit Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                         if (codeController.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Code is required')),
+                          );
+                          return;
+                        }
+                        if (dnsController.text.trim().isEmpty) {
+                           ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('DNS is required')),
+                          );
+                          return;
+                        }
+
+                        // DNS Logic
+                        String finalDnsId = '';
+                        final dnsUrl = dnsController.text.trim();
+                        try {
+                          final existingDns = dnsList.firstWhere(
+                            (d) => d.dnsAddress == dnsUrl,
+                            orElse: () => DnsModel(id: '', dnsAddress: '', username: '', password: ''),
+                          );
+
+                          if (existingDns.id.isNotEmpty) {
+                            finalDnsId = existingDns.id;
+                          } else {
+                            final newDnsId = DateTime.now().millisecondsSinceEpoch.toString();
+                            final newDns = DnsModel(
+                              id: newDnsId,
+                              title: Uri.tryParse(dnsUrl)?.host ?? 'Auto Created',
+                              dnsAddress: dnsUrl,
+                              username: '',
+                              password: '',
+                            );
+                            await _dnsRepo.addDns(newDns);
+                            finalDnsId = newDnsId;
+                          }
+                        } catch (e) {
+                          print('DNS Error: $e');
+                          return;
+                        }
+
+                        final newCode = ActivationCodeModel(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          title: Uri.tryParse(dnsUrl)?.host ?? 'My Playlist', // Fallback title
+                          code: codeController.text.trim(),
+                          dnsId: finalDnsId,
+                          username: usernameController.text.trim(),
+                          password: passwordController.text.trim(),
+                          userStatus: selectedStatus,
+                        );
+
+                        final addedCode = await _repo.addCode(newCode);
+                        if (addedCode != null) {
+                          _loadData(); // Reload list
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Code added: ${newCode.code}')),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Submit'),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'active', child: Text('Active')),
-                      DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
-                      DropdownMenuItem(value: 'trial', child: Text('Trial')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setState(() => selectedStatus = val);
-                    },
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(
+             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                 if (codeController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Code is required')),
-                  );
-                  return;
-                }
-
-                final newCode = ActivationCodeModel(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  title: titleController.text.trim(),
-                  code: codeController.text.trim(),
-                  dnsId: selectedDnsId,
-                  username: usernameController.text.trim(),
-                  password: passwordController.text.trim(),
-                  userStatus: selectedStatus,
-                );
-
-                final addedCode = await _repo.addCode(newCode);
-                if (addedCode != null) {
-                  _loadData(); // Reload list
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Code added: ${newCode.code}')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Add Code'),
             ),
           ],
         ),
