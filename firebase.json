@@ -1,1 +1,22 @@
-{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"kingplayer-2025","configurations":{"web":"1:869997753590:web:650880c00a3c8ce59568d7"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "kingplayer-2025",
+          "configurations": {
+            "web": "1:869997753590:web:650880c00a3c8ce59568d7"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+   "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
