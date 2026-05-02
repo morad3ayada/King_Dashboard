@@ -20,7 +20,8 @@ class WebRouter {
       case WebRoutes.users:
       case WebRoutes.activationCodes:
       case WebRoutes.sportSettings:
-      case WebRoutes.imageList:
+      case WebRoutes.appSettings:
+      case WebRoutes.colorsScreens:
         // Note: Deep linking with args needs state management or query params in web.
         // For simple usage, we redirect to login if no user arg is present, or dashboard default.
         return MaterialPageRoute(builder: (_) => const WebDashboardLayout());

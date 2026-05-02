@@ -19,7 +19,7 @@ class AdminUser {
 
   factory AdminUser.fromJson(Map<String, dynamic> json) {
     return AdminUser(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       username: json['username'] ?? '',
       email: json['email'] ?? '',

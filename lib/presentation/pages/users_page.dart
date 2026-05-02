@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-import '../../core/routing/web_router.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/dns_model.dart';
 import '../../data/repository/users_repo.dart';
@@ -19,11 +20,22 @@ class _UsersPageState extends State<UsersPage> {
   final _searchController = TextEditingController();
   
   String _searchQuery = '';
+  List<DnsModel> _dnsList = [];
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _loadDnsList();
+  }
+
+  Future<void> _loadDnsList() async {
+    final dns = await _dnsRepo.getAllDns();
+    if (mounted) {
+      setState(() {
+        _dnsList = dns;
+      });
+    }
   }
 
   void _search(String query) {
@@ -35,10 +47,34 @@ class _UsersPageState extends State<UsersPage> {
   List<WebUserModel> _filterUsers(List<WebUserModel> users) {
     if (_searchQuery.isEmpty) return users;
     return users.where((user) {
-      return user.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             user.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             user.macAddress.toLowerCase().contains(_searchQuery.toLowerCase());
+      return user.email.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             user.macAddress.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             (user.deviceManager ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
+  }
+
+  Future<String?> _fetchExpiryFromApi(String dnsAddress, String username, String password) async {
+    try {
+      String baseUrl = dnsAddress.endsWith('/') ? dnsAddress.substring(0, dnsAddress.length - 1) : dnsAddress;
+      final url = Uri.parse('$baseUrl/player_api.php?username=$username&password=$password');
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data != null && data['user_info'] != null) {
+          final expDateStr = data['user_info']['exp_date'];
+          if (expDateStr != null && expDateStr != "" && expDateStr != "null") {
+            final timestamp = int.tryParse(expDateStr.toString());
+            if (timestamp != null) {
+              final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+              return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error fetching expiry: $e');
+    }
+    return null;
   }
 
   Future<void> _toggleProtect(WebUserModel user) async {
@@ -51,266 +87,151 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  Future<void> _showAddTrialDialog(WebUserModel user) async {
-    final daysController = TextEditingController(text: '30');
-    
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add Trial for ${user.title}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: daysController,
-              decoration: const InputDecoration(
-                labelText: 'Trial Days',
-                suffixText: 'days',
-              ),
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final days = int.tryParse(daysController.text) ?? 30;
-              final success = await _repo.addTrial(user.id, days);
-              if (success && context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Trial added: $days days')),
-                );
-              }
-            },
-            child: const Text('Add Trial'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showEditUserDialog(WebUserModel user) async {
-    final usernameController = TextEditingController(text: user.username);
-    final emailController = TextEditingController(text: user.email ?? '');
-    final passwordController = TextEditingController(text: user.password ?? '');
-    final titleController = TextEditingController(text: user.title);
-    final macAddressController = TextEditingController(text: user.macAddress);
-    final dnsIdController = TextEditingController(text: user.dnsId);
-    final deviceManagerController = TextEditingController(text: user.deviceManager ?? '');
-    final subscriptionTypeController = TextEditingController(text: user.subscriptionType ?? 'inactive');
-    DateTime? selectedExpiryDate = user.expiryDate;
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit User: ${user.username}'),
-        content: SingleChildScrollView(
-          child: SizedBox(
-            width: 500,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username *',
-                    hintText: 'Enter username',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'Enter email',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    hintText: 'Enter new password (leave empty to keep current)',
-                    border: OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Title *',
-                    hintText: 'Enter title',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: macAddressController,
-                  decoration: const InputDecoration(
-                    labelText: 'MAC Address *',
-                    hintText: 'Enter MAC address',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: dnsIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'DNS ID *',
-                    hintText: 'Enter DNS ID',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: deviceManagerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Device Manager',
-                    hintText: 'Enter device manager (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: subscriptionTypeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Subscription Type',
-                    hintText: 'active, inactive, trial, etc.',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                StatefulBuilder(
-                  builder: (context, setState) => Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          selectedExpiryDate != null
-                              ? 'Expiry: ${selectedExpiryDate!.day}/${selectedExpiryDate!.month}/${selectedExpiryDate!.year}'
-                              : 'No expiry date set',
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: selectedExpiryDate ?? DateTime.now().add(const Duration(days: 30)),
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-                          );
-                          if (date != null) {
-                            setState(() => selectedExpiryDate = date);
-                          }
-                        },
-                        icon: const Icon(Icons.calendar_today),
-                        label: const Text('Select Date'),
-                      ),
-                      if (selectedExpiryDate != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () => setState(() => selectedExpiryDate = null),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              // Validate required fields
-              if (usernameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Username is required')),
-                );
-                return;
-              }
-              if (titleController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Title is required')),
-                );
-                return;
-              }
-              if (macAddressController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('MAC Address is required')),
-                );
-                return;
-              }
-
-              // Update user
-              final updatedUser = user.copyWith(
-                username: usernameController.text.trim(),
-                email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-                password: passwordController.text.trim().isEmpty ? user.password : passwordController.text.trim(),
-                title: titleController.text.trim(),
-                macAddress: macAddressController.text.trim(),
-                dnsId: dnsIdController.text.trim(),
-                deviceManager: deviceManagerController.text.trim().isEmpty ? null : deviceManagerController.text.trim(),
-                subscriptionType: subscriptionTypeController.text.trim().isEmpty ? 'inactive' : subscriptionTypeController.text.trim(),
-                expiryDate: selectedExpiryDate,
-              );
-
-              final success = await _repo.updateUser(updatedUser);
-              if (success && context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('User updated successfully')),
-                );
-              } else {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to update user')),
-                  );
-                }
-              }
-            },
-            child: const Text('Update User'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showAddUserDialog() async {
-    setState(() => _isLoading = true);
-    final dnsList = await _dnsRepo.getAllDns();
-    setState(() => _isLoading = false);
-
+  Future<void> _showAddDnsDialog(WebUserModel user) async {
     final m3uController = TextEditingController();
-    final macAddressController = TextEditingController();
-    final serverNameController = TextEditingController();
-    final dnsController = TextEditingController(); 
-    final usernameController = TextEditingController(); // Optional Username
-    final emailController = TextEditingController(); 
-    final passwordController = TextEditingController();
-    
-    // Default values
-    bool isProtected = true; 
-    String selectedProtection = 'YES';
-
-    if (!mounted) return;
+    final dnsController = TextEditingController();
+    final usernameController = TextEditingController(); 
+    final passwordController = TextEditingController(); 
+    final titleController = TextEditingController();
+    String? currentExpiry;
+    bool isFetching = false;
+    bool dnsPermissions = false;
 
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          contentPadding: const EdgeInsets.all(24),
+          title: Text('Add DNS Line to ${user.email}'),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Extract from M3U', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: m3uController,
+                          decoration: const InputDecoration(hintText: 'Paste M3U link'),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () async {
+                          final url = m3uController.text.trim();
+                          if (url.isNotEmpty) {
+                            try {
+                              final uri = Uri.parse(url);
+                              dnsController.text = '${uri.scheme}://${uri.host}${uri.port != 0 ? ":${uri.port}" : ""}';
+                              final params = uri.queryParameters;
+                              if (params.containsKey('username')) usernameController.text = params['username']!;
+                              if (params.containsKey('password')) passwordController.text = params['password']!;
+                              titleController.text = uri.host;
+                              setState(() => isFetching = true);
+                              final expiry = await _fetchExpiryFromApi(dnsController.text, usernameController.text, passwordController.text);
+                              setState(() {
+                                currentExpiry = expiry;
+                                isFetching = false;
+                              });
+                            } catch (_) {}
+                          }
+                        },
+                        icon: const Icon(Icons.download),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Playlist Title / Name')),
+                  TextField(controller: dnsController, decoration: const InputDecoration(labelText: 'DNS Address')),
+                  TextField(controller: usernameController, decoration: const InputDecoration(labelText: 'Playlist Username')),
+                  TextField(controller: passwordController, decoration: const InputDecoration(labelText: 'Playlist Password')),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    title: const Text('Playlist Permissions', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Enable special permissions for this line', style: TextStyle(fontSize: 10)),
+                    value: dnsPermissions,
+                    onChanged: (v) => setState(() => dnsPermissions = v ?? false),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          isFetching ? 'Fetching Expiry...' : (currentExpiry ?? 'Expiry: N/A'),
+                          style: TextStyle(color: currentExpiry != null ? Colors.green : Colors.grey, fontWeight: currentExpiry != null ? FontWeight.bold : FontWeight.normal),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: isFetching ? null : () async {
+                          setState(() => isFetching = true);
+                          final expiry = await _fetchExpiryFromApi(dnsController.text, usernameController.text, passwordController.text);
+                          setState(() {
+                            currentExpiry = expiry;
+                            isFetching = false;
+                          });
+                        },
+                        icon: const Icon(Icons.sync),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (dnsController.text.isEmpty) return;
+                final dnsId = DateTime.now().millisecondsSinceEpoch.toString();
+                final newDns = DnsModel(
+                  id: dnsId,
+                  title: titleController.text.trim().isEmpty ? 'DNS Line' : titleController.text.trim(),
+                  dnsAddress: dnsController.text.trim(),
+                  username: usernameController.text.trim(),
+                  password: passwordController.text.trim(),
+                  expiryDate: currentExpiry,
+                  permissions: dnsPermissions,
+                );
+                await _dnsRepo.addDns(newDns);
+                final updatedUser = user.copyWith(dnsIds: [...user.dnsIds, dnsId]);
+                await _repo.updateUser(updatedUser);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _loadDnsList();
+                }
+              },
+              child: const Text('Add DNS Line'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddUserDialog() async {
+    final emailController = TextEditingController();
+    final accountPasswordController = TextEditingController();
+    
+    final m3uController = TextEditingController();
+    final dnsTitleController = TextEditingController();
+    final dnsAddressController = TextEditingController(); 
+    final playlistUsernameController = TextEditingController();
+    final playlistPasswordController = TextEditingController();
+    
+    String selectedSubscription = 'active';
+    bool isProtected = true;
+    bool dnsPermissions = false;
+    String? currentExpiry;
+    bool isFetching = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Add New User & DNS Line'),
           content: SingleChildScrollView(
             child: SizedBox(
               width: 500,
@@ -318,274 +239,172 @@ class _UsersPageState extends State<UsersPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   const Text(
-                    'M3U Extractor',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
+                  const Text('Account Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: m3uController,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter M3U Link',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Subscription Type', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            DropdownButton<String>(
+                              value: selectedSubscription,
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(value: 'active', child: Text('Active')),
+                                DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                                DropdownMenuItem(value: 'trial', child: Text('Trial')),
+                              ],
+                              onChanged: (v) => setState(() => selectedSubscription = v!),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // Extract Logic
-                          final url = m3uController.text.trim();
-                          if (url.isNotEmpty) {
-                            try {
-                              final uri = Uri.parse(url);
-                              final scheme = uri.scheme;
-                              final host = uri.host;
-                              final port = uri.port;
-                              
-                              // DNS
-                              String dns = '$scheme://$host';
-                              // Always include port to ensure compatibility with all players
-                              if (port != 0) {
-                                dns += ':$port';
-                              }
-                              dnsController.text = dns;
-
-                              // Username & Password from query params
-                              final params = uri.queryParameters;
-                              if (params.containsKey('username')) {
-                                usernameController.text = params['username']!;
-                              }
-                              if (params.containsKey('password')) {
-                                passwordController.text = params['password']!;
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Invalid URL format')),
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.download), 
-                        label: const Text('Extract'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00C853), 
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Protect Playlist', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            Row(
+                              children: [
+                                const Text('Protected'),
+                                Switch(
+                                  value: isProtected,
+                                  onChanged: (v) => setState(() => isProtected = v),
+                                  activeColor: Colors.green,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // MAC Address
-                  const Text('Mac address', style: TextStyle(color: Colors.grey)),
+                  TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Login Email / Username', border: OutlineInputBorder(), isDense: true)),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: macAddressController,
-                    decoration: const InputDecoration(
-                      hintText: 'A7:75:7C:0A:43:48',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
+                  TextField(controller: accountPasswordController, decoration: const InputDecoration(labelText: 'Login Password', border: OutlineInputBorder(), isDense: true)),
+                  
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
+                  
+                  const Text('Playlist / DNS Line Information', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                  const SizedBox(height: 16),
+                  const Text('Title', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  TextField(controller: dnsTitleController, decoration: const InputDecoration(hintText: 'Enter Playlist Title (e.g. King Server)', border: OutlineInputBorder(), isDense: true)),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    title: const Text('Playlist Permissions', style: TextStyle(fontSize: 14)),
+                    value: dnsPermissions,
+                    onChanged: (v) => setState(() => dnsPermissions = v ?? false),
+                    contentPadding: EdgeInsets.zero,
                   ),
                   const SizedBox(height: 16),
-
-                  // Protect this playlist
-                  const Text('Protect this playlist', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedProtection,
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(value: 'YES', child: Text('YES')),
-                          DropdownMenuItem(value: 'NO', child: Text('NO')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setState(() => selectedProtection = val);
-                        },
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: m3uController,
+                          decoration: const InputDecoration(hintText: 'Extract from M3U Link', border: OutlineInputBorder(), isDense: true),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Server Name
-                  const Text('Server Name', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: serverNameController,
-                    decoration: const InputDecoration(
-                      hintText: 'new name',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // DNS
-                  const Text('DNS', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: dnsController,
-                    decoration: const InputDecoration(
-                      hintText: 'http://domain.com:port',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Username (Optional)
-                  const Text('Username (Optional)', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter username',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Email
-                  const Text('Email', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: emailController,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter email',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Password
-                  const Text('Password', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter password',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    obscureText: false, 
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        // Validation
-                        // Require DNS and Password.
-                        // Require either Username or Email to be present.
-                        if (dnsController.text.isEmpty || passwordController.text.isEmpty) {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please fill in required fields (DNS, Password)')),
-                          );
-                          return;
-                        }
-                        
-                        if (usernameController.text.isEmpty && emailController.text.isEmpty) {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please provide either Username or Email')),
-                          );
-                          return;
-                        }
-
-                        // Handle DNS logic
-                        String finalDnsId = '';
-                        final dnsUrl = dnsController.text.trim();
-                        
-                        // Check if DNS exists
-                        try {
-                          final existingDns = dnsList.firstWhere(
-                            (d) => d.dnsAddress == dnsUrl,
-                            orElse: () => DnsModel(id: '', dnsAddress: '', username: '', password: ''), 
-                          );
-
-                          if (existingDns.id.isNotEmpty) {
-                            finalDnsId = existingDns.id;
-                          } else {
-                            // Create new DNS
-                            final newDnsId = DateTime.now().millisecondsSinceEpoch.toString();
-                            final newDns = DnsModel(
-                              id: newDnsId,
-                              title: Uri.tryParse(dnsUrl)?.host ?? 'Auto Created',
-                              dnsAddress: dnsUrl,
-                              username: '',
-                              password: '',
-                            );
-                            await _dnsRepo.addDns(newDns);
-                            finalDnsId = newDnsId;
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () async {
+                          final url = m3uController.text.trim();
+                          if (url.isNotEmpty) {
+                            try {
+                              final uri = Uri.parse(url);
+                              dnsAddressController.text = '${uri.scheme}://${uri.host}${uri.port != 0 ? ":${uri.port}" : ""}';
+                              final params = uri.queryParameters;
+                              if (params.containsKey('username')) playlistUsernameController.text = params['username']!;
+                              if (params.containsKey('password')) playlistPasswordController.text = params['password']!;
+                              if (dnsTitleController.text.isEmpty) dnsTitleController.text = uri.host;
+                              
+                              setState(() => isFetching = true);
+                              final expiry = await _fetchExpiryFromApi(dnsAddressController.text, playlistUsernameController.text, playlistPasswordController.text);
+                              setState(() {
+                                currentExpiry = expiry;
+                                isFetching = false;
+                              });
+                            } catch (_) {}
                           }
-                        } catch (e) {
-                           print('Error handling DNS: $e');
-                           return; 
-                        }
-
-                        // Determine primary username
-                        final finalUsername = usernameController.text.trim().isNotEmpty
-                            ? usernameController.text.trim()
-                            : emailController.text.trim();
-
-                        // Create User
-                        final newUser = WebUserModel(
-                          id: DateTime.now().millisecondsSinceEpoch.toString(),
-                          title: serverNameController.text.trim().isEmpty 
-                              ? finalUsername
-                              : serverNameController.text.trim(),
-                          macAddress: macAddressController.text.trim(),
-                          username: finalUsername,
-                          email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-                          password: passwordController.text.trim(),
-                          isProtected: selectedProtection == 'YES',
-                          dnsId: finalDnsId,
-                          // Defaults
-                          subscriptionType: 'active',
-                          deviceManager: null, 
-                        );
-
-                        final success = await _repo.addUser(newUser);
-                        if (success && context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('User added successfully')),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        },
+                        icon: const Icon(Icons.download, color: Colors.green),
                       ),
-                      child: const Text('Submit'), 
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(controller: dnsAddressController, decoration: const InputDecoration(labelText: 'DNS Address', border: OutlineInputBorder(), isDense: true)),
+                  const SizedBox(height: 8),
+                  TextField(controller: playlistUsernameController, decoration: const InputDecoration(labelText: 'Playlist Username', border: OutlineInputBorder(), isDense: true)),
+                  const SizedBox(height: 8),
+                  TextField(controller: playlistPasswordController, decoration: const InputDecoration(labelText: 'Playlist Password', border: OutlineInputBorder(), isDense: true)),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          isFetching ? 'Fetching Expiry...' : (currentExpiry ?? 'Expiry: N/A'),
+                          style: TextStyle(color: currentExpiry != null ? Colors.green : Colors.grey, fontWeight: currentExpiry != null ? FontWeight.bold : FontWeight.normal),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: isFetching ? null : () async {
+                          setState(() => isFetching = true);
+                          final expiry = await _fetchExpiryFromApi(dnsAddressController.text, playlistUsernameController.text, playlistPasswordController.text);
+                          setState(() {
+                            currentExpiry = expiry;
+                            isFetching = false;
+                          });
+                        },
+                        icon: const Icon(Icons.sync),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (emailController.text.isEmpty || accountPasswordController.text.isEmpty || dnsAddressController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields')));
+                  return;
+                }
+
+                final dnsId = DateTime.now().millisecondsSinceEpoch.toString();
+                final newDns = DnsModel(
+                  id: dnsId,
+                  title: dnsTitleController.text.trim().isEmpty ? 'DNS Line' : dnsTitleController.text.trim(),
+                  dnsAddress: dnsAddressController.text.trim(),
+                  username: playlistUsernameController.text.trim(),
+                  password: playlistPasswordController.text.trim(),
+                  expiryDate: currentExpiry,
+                  permissions: dnsPermissions,
+                );
+                await _dnsRepo.addDns(newDns);
+
+                final newUser = WebUserModel(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  email: emailController.text.trim(),
+                  password: accountPasswordController.text.trim(),
+                  macAddress: "",
+                  dnsIds: [dnsId],
+                  subscriptionType: selectedSubscription,
+                  isProtected: isProtected,
+                );
+
+                await _repo.addUser(newUser);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _loadDnsList();
+                }
+              },
+              child: const Text('Create User & DNS'),
             ),
           ],
         ),
@@ -593,50 +412,21 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Future<void> _deleteUser(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this user?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final success = await _repo.deleteUser(id);
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User deleted successfully')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
+              SizedBox(
+                width: 400,
                 child: TextField(
                   controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'Search users...',
-                    prefixIcon: Icon(Icons.search),
-                  ),
+                  decoration: const InputDecoration(hintText: 'Search by Email, MAC or Device Key...', prefixIcon: Icon(Icons.search), border: OutlineInputBorder()),
                   onChanged: _search,
                 ),
               ),
@@ -645,96 +435,78 @@ class _UsersPageState extends State<UsersPage> {
                 onPressed: _showAddUserDialog,
                 icon: const Icon(Icons.person_add),
                 label: const Text('Add User'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20)),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           Expanded(
             child: StreamBuilder<List<WebUserModel>>(
               stream: _repo.getUsersStream(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  );
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
                 final users = _filterUsers(snapshot.data!);
+                if (users.isEmpty) return const Center(child: Text('No users found'));
 
-                if (users.isEmpty) {
-                  return const Center(
-                    child: Text('No users found'),
-                  );
-                }
-
-                return Card(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('Title')),
-                        DataColumn(label: Text('MAC Address')),
-                        DataColumn(label: Text('Username')),
-                        DataColumn(label: Text('Email')),
-                        DataColumn(label: Text('Device Key')),
-                        DataColumn(label: Text('Subscription')),
-                        DataColumn(label: Text('Protect')),
-                        DataColumn(label: Text('DNS')),
-                        DataColumn(label: Text('Expiry')),
-                        DataColumn(label: Text('Actions')),
-                      ],
-                      rows: users.map((user) {
-                        return DataRow(cells: [
-                          DataCell(Text(user.title)),
-                          DataCell(Text(user.macAddress)),
-                          DataCell(Text(user.username)),
-                          DataCell(Text(user.email ?? 'N/A')),
-                          DataCell(Text(user.deviceManager ?? 'N/A')),
-                          DataCell(Text(user.subscriptionType ?? 'inactive')),
-                          DataCell(
-                            Switch(
-                              value: user.isProtected,
-                              onChanged: (_) => _toggleProtect(user),
+                return Center(
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('Email / Login', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('MAC Address', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Device Key', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Subscription', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('DNS Lines', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Protect', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                        rows: users.map((user) {
+                          return DataRow(cells: [
+                            DataCell(Text(user.email)),
+                            DataCell(Text(user.macAddress.isEmpty ? 'Waiting...' : user.macAddress)),
+                            DataCell(Text(user.deviceManager == null || user.deviceManager!.isEmpty ? 'N/A' : user.deviceManager!)),
+                            DataCell(Text(user.subscriptionType ?? 'active')),
+                            DataCell(
+                              Row(
+                                children: [
+                                  ...user.dnsIds.map((id) {
+                                    final dns = _dnsList.firstWhere((d) => d.id == id, orElse: () => DnsModel(id: '', dnsAddress: 'N/A'));
+                                    return Tooltip(
+                                      message: 'Line: ${dns.title}\nUser: ${dns.username}\nExp: ${dns.expiryDate ?? "N/A"}\nPerm: ${dns.permissions}',
+                                      child: Container(
+                                        margin: const EdgeInsets.only(right: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.blue)),
+                                        child: Text(dns.title.isEmpty ? 'Line' : dns.title, style: const TextStyle(fontSize: 10, color: Colors.blue)),
+                                      ),
+                                    );
+                                  }),
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle_outline, size: 16, color: Colors.blue),
+                                    onPressed: () => _showAddDnsDialog(user),
+                                    tooltip: 'Add New Line',
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          DataCell(Text('DNS ${user.dnsId}')),
-                          DataCell(Text(
-                            user.expiryDate != null
-                                ? '${user.expiryDate!.day}/${user.expiryDate!.month}/${user.expiryDate!.year}'
-                                : 'N/A',
-                          )),
-                          DataCell(
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20),
-                                  onPressed: () => _showEditUserDialog(user),
-                                  tooltip: 'Edit',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.card_giftcard, size: 20, color: Colors.orange),
-                                  onPressed: () => _showAddTrialDialog(user),
-                                  tooltip: 'Add Trial',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                                  onPressed: () => _deleteUser(user.id),
-                                  tooltip: 'Delete',
-                                ),
-                              ],
+                            DataCell(Switch(value: user.isProtected, onChanged: (_) => _toggleProtect(user), activeColor: Colors.green)),
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(icon: const Icon(Icons.delete, size: 20, color: Colors.red), onPressed: () => _repo.deleteUser(user.id), tooltip: 'Delete Account'),
+                                ],
+                              ),
                             ),
-                          ),
-                        ]);
-                      }).toList(),
+                          ]);
+                        }).toList(),
+                      ),
                     ),
                   ),
                 );
@@ -742,7 +514,8 @@ class _UsersPageState extends State<UsersPage> {
             ),
           ),
         ],
-      );
+      ),
+    );
   }
 
   @override

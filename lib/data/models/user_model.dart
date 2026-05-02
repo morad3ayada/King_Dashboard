@@ -2,32 +2,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WebUserModel {
   final String id;
-  final String title;
+  final String email; // Primary login identifier
+  final String? password; // Account Login Password
   final String macAddress;
-  final String username;
-  final String? email;
-  final String? password;
   final bool isProtected;
-  final String dnsId;
-  final String? deviceManager; // Device manager identifier
-  final String? subscriptionType; // Subscription type: active, inactive, trial, etc.
+  final List<String> dnsIds;
+  final String? deviceManager; // Device key
+  final String? subscriptionType; 
   final DateTime createdAt;
-  final DateTime? expiryDate;
   final DateTime? lastLogin;
 
   WebUserModel({
     required this.id,
-    required this.title,
-    required this.macAddress,
-    required this.username,
-    this.email,
+    required this.email,
     this.password,
+    this.macAddress = '',
     this.isProtected = false,
-    required this.dnsId,
+    required this.dnsIds,
     this.deviceManager,
     this.subscriptionType,
     DateTime? createdAt,
-    this.expiryDate,
     this.lastLogin,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -40,18 +34,18 @@ class WebUserModel {
 
   factory WebUserModel.fromJson(Map<String, dynamic> json) {
     return WebUserModel(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      macAddress: json['mac_address'] ?? '',
-      username: json['username'] ?? '',
-      email: json['email'],
-      password: json['password'],
+      id: json['id']?.toString() ?? '',
+      // Use email if present, fallback to username for old records
+      email: json['email']?.toString() ?? json['username']?.toString() ?? '',
+      password: json['password']?.toString(),
+      macAddress: json['mac_address']?.toString() ?? '',
       isProtected: json['is_protected'] ?? false,
-      dnsId: json['dns_id'] ?? '',
-      deviceManager: json['device_key'],
-      subscriptionType: json['subscription_type'],
+      dnsIds: json['dns_id'] is List 
+          ? List<String>.from(json['dns_id'])
+          : (json['dns_id'] != null ? [json['dns_id'].toString()] : []),
+      deviceManager: json['device_key']?.toString(),
+      subscriptionType: json['subscription_type']?.toString(),
       createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
-      expiryDate: _parseDate(json['expiry_date']),
       lastLogin: _parseDate(json['last_login']),
     );
   }
@@ -59,49 +53,41 @@ class WebUserModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'title': title,
-      'mac_address': macAddress,
-      'username': username,
       'email': email,
+      // REMOVED 'username' to clean up the collection
       'password': password,
+      'mac_address': macAddress,
       'is_protected': isProtected,
-      'dns_id': dnsId,
+      'dns_id': dnsIds,
       'device_key': deviceManager,
       'subscription_type': subscriptionType,
       'created_at': createdAt.toIso8601String(),
-      'expiry_date': expiryDate?.toIso8601String(),
       'last_login': lastLogin?.toIso8601String(),
     };
   }
 
   WebUserModel copyWith({
     String? id,
-    String? title,
-    String? macAddress,
-    String? username,
     String? email,
     String? password,
+    String? macAddress,
     bool? isProtected,
-    String? dnsId,
+    List<String>? dnsIds,
     String? deviceManager,
     String? subscriptionType,
     DateTime? createdAt,
-    DateTime? expiryDate,
     DateTime? lastLogin,
   }) {
     return WebUserModel(
       id: id ?? this.id,
-      title: title ?? this.title,
-      macAddress: macAddress ?? this.macAddress,
-      username: username ?? this.username,
       email: email ?? this.email,
       password: password ?? this.password,
+      macAddress: macAddress ?? this.macAddress,
       isProtected: isProtected ?? this.isProtected,
-      dnsId: dnsId ?? this.dnsId,
+      dnsIds: dnsIds ?? this.dnsIds,
       deviceManager: deviceManager ?? this.deviceManager,
       subscriptionType: subscriptionType ?? this.subscriptionType,
       createdAt: createdAt ?? this.createdAt,
-      expiryDate: expiryDate ?? this.expiryDate,
       lastLogin: lastLogin ?? this.lastLogin,
     );
   }

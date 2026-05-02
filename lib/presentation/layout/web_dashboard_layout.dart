@@ -7,7 +7,8 @@ import '../pages/dns_settings_page.dart';
 import '../pages/users_page.dart';
 import '../pages/activation_codes_page.dart';
 import '../pages/sports_page.dart';
-import '../pages/images_page.dart';
+import '../pages/app_Setting _page.dart';
+import '../pages/colors_page.dart';
 
 class WebDashboardLayout extends StatefulWidget {
   final AdminUser? currentUser;
@@ -42,7 +43,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
     if (_hasPermission('access_users')) return WebRoutes.users;
     if (_hasPermission('access_codes')) return WebRoutes.activationCodes;
     // Images accessible to all
-    return WebRoutes.imageList; 
+    return WebRoutes.appSettings; 
   }
 
   @override
@@ -117,9 +118,15 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       
                       // Image List - accessible to all
                       _buildMenuItem(
-                        icon: Icons.image,
-                        title: 'Image List',
-                        route: WebRoutes.imageList,
+                        icon: Icons.settings,
+                        title: 'App Setting',
+                        route: WebRoutes.appSettings,
+                      ),
+
+                      _buildMenuItem(
+                        icon: Icons.color_lens_outlined,
+                        title: 'Colors Screens',
+                        route: WebRoutes.colorsScreens,
                       ),
                         
                       const Divider(color: Colors.white24, height: 24),
@@ -203,8 +210,6 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     initialRoute: _currentRoute, // Use computed accessible route
                     onGenerateRoute: (settings) {
                       Widget page;
-                      // Fallback logic in case _currentRoute is set to something forbidden (shouldn't happen with UI logic but good for safety)
-                      // We can re-check permissions here if needed.
                       
                       switch (settings.name) {
                         case WebRoutes.adminInfo:
@@ -222,8 +227,11 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         case WebRoutes.sportSettings:
                           page = const SportsPage();
                           break;
-                        case WebRoutes.imageList:
-                          page = const ImagesPage();
+                        case WebRoutes.appSettings:
+                          page = const AppSettingsPage();
+                          break;
+                        case WebRoutes.colorsScreens:
+                          page = const ColorsPage();
                           break;
                         default:
                           page = AdminInfoPage(currentUser: widget.currentUser);
@@ -246,7 +254,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
       ),
     );
   }
-// ... keep existing methods _buildMenuItem and _getPageTitle ...
+
   Widget _buildMenuItem({
     required IconData icon,
     required String title,
@@ -291,8 +299,10 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
         return 'Activation Codes';
       case WebRoutes.sportSettings:
         return 'Sports Settings';
-      case WebRoutes.imageList:
-        return 'Image Gallery';
+      case WebRoutes.appSettings:
+        return 'App Settings';
+      case WebRoutes.colorsScreens:
+        return 'Colors Screens';
       default:
         return 'Dashboard';
     }

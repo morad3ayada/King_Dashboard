@@ -7,24 +7,24 @@ class UsersRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collection = 'users';
 
-  // Stream for real-time updates
+  // Get users stream
   Stream<List<WebUserModel>> getUsersStream() {
     return _firestore.collection(_collection).snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return WebUserModel.fromJson({...data, 'id': data['id'] ?? doc.id});
-      }).toList();
+      return snapshot.docs.map((doc) => WebUserModel.fromJson({
+        ...doc.data(),
+        'id': doc.id,
+      })).toList();
     });
   }
 
-  // Get all users (one-time fetch)
+  // Get all users
   Future<List<WebUserModel>> getAllUsers() async {
     try {
       final snapshot = await _firestore.collection(_collection).get();
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return WebUserModel.fromJson({...data, 'id': data['id'] ?? doc.id});
-      }).toList();
+      return snapshot.docs.map((doc) => WebUserModel.fromJson({
+        ...doc.data(),
+        'id': doc.id,
+      })).toList();
     } catch (e) {
       print('Error getting users: $e');
       return [];
@@ -35,8 +35,7 @@ class UsersRepository {
   Future<List<WebUserModel>> searchUsers(String query) async {
     final allUsers = await getAllUsers();
     return allUsers.where((user) {
-      return user.title.toLowerCase().contains(query.toLowerCase()) ||
-             user.username.toLowerCase().contains(query.toLowerCase()) ||
+      return user.email.toLowerCase().contains(query.toLowerCase()) ||
              user.macAddress.toLowerCase().contains(query.toLowerCase());
     }).toList();
   }
@@ -45,47 +44,24 @@ class UsersRepository {
   Future<bool> addUser(WebUserModel user) async {
     try {
       // Create user in Firebase Authentication if email and password are provided
-      if (user.email != null && user.email!.isNotEmpty && 
+      if (user.email.isNotEmpty && 
           user.password != null && user.password!.isNotEmpty) {
         try {
           print('Attempting to create auth user with email: ${user.email}');
           
-          // Create auth user
           final userCredential = await _auth.createUserWithEmailAndPassword(
-            email: user.email!,
+            email: user.email,
             password: user.password!,
           );
           
           print('✅ Auth user created successfully with UID: ${userCredential.user!.uid}');
-          
-          // Update the user model with the Firebase Auth UID
-          final updatedUser = user.copyWith(
-            id: userCredential.user!.uid,
-          );
-          
-          // Save to Firestore with the Auth UID
-          await _firestore.collection(_collection).doc(updatedUser.id).set(updatedUser.toJson());
-          
-          print('✅ User saved to Firestore with UID: ${userCredential.user!.uid}');
-          return true;
-        } on FirebaseAuthException catch (authError) {
-          print('❌ Firebase Auth Error: ${authError.code} - ${authError.message}');
-          // If auth creation fails, still save to Firestore with generated ID
-          await _firestore.collection(_collection).doc(user.id).set(user.toJson());
-          print('⚠️ User saved to Firestore only (Auth failed): ${user.id}');
-          return true;
         } catch (authError) {
-          print('❌ Unknown Auth Error: $authError');
-          // If auth creation fails, still save to Firestore with generated ID
-          await _firestore.collection(_collection).doc(user.id).set(user.toJson());
-          return true;
+          print('⚠️ Auth creation failed (user might already exist): $authError');
         }
-      } else {
-        print('ℹ️ No email/password provided, saving to Firestore only');
-        // No email/password, just save to Firestore
-        await _firestore.collection(_collection).doc(user.id).set(user.toJson());
-        return true;
       }
+
+      await _firestore.collection(_collection).doc(user.id).set(user.toJson());
+      return true;
     } catch (e) {
       print('Error adding user: $e');
       return false;
@@ -130,21 +106,29 @@ class UsersRepository {
     }
   }
 
-  // Delete user
+  // Delete user with cascade delete for DNS settings
   Future<bool> deleteUser(String id) async {
     try {
-      // Delete from Firestore
+      // 1. Get user document to find linked DNS IDs
+      final userDoc = await _firestore.collection(_collection).doc(id).get();
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        final dnsIds = data?['dns_id'];
+        
+        if (dnsIds is List) {
+          // 2. Delete all linked DNS settings from 'dns_settings' collection
+          for (var dnsId in dnsIds) {
+            await _firestore.collection('dns_settings').doc(dnsId.toString()).delete();
+          }
+        }
+      }
+
+      // 3. Delete user document from Firestore
       await _firestore.collection(_collection).doc(id).delete();
       
-      // Try to delete from Firebase Auth
-      // Note: This requires admin SDK or the user to be currently signed in
-      // For now, we'll just delete from Firestore
-      // To delete from Auth, you'd need Firebase Admin SDK or Cloud Functions
-      
-      print('User deleted from Firestore: $id');
       return true;
     } catch (e) {
-      print('Error deleting user: $e');
+      print('Error deleting user and their DNS settings: $e');
       return false;
     }
   }

@@ -206,5 +206,32 @@ class SharedStorageService {
       rethrow;
     }
   }
+
+  // ==================== ACTIVATION SETTINGS ====================
+
+  Future<String?> getBaseDomain() async {
+    try {
+      final doc = await _firestore.collection('app_settings').doc('activation_settings').get();
+      if (doc.exists && doc.data() != null) {
+        return doc.data()!['base_domain'] as String?;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting base domain: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveBaseDomain(String domain) async {
+    try {
+      await _firestore.collection('app_settings').doc('activation_settings').set({
+        'base_domain': domain,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      print('Error saving base domain: $e');
+      rethrow;
+    }
+  }
 }
 

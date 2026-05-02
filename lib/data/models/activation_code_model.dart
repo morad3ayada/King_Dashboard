@@ -38,7 +38,7 @@ class ActivationCodeModel {
 
   factory ActivationCodeModel.fromJson(Map<String, dynamic> json) {
     return ActivationCodeModel(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
       code: json['code'] ?? '',
       dnsId: json['dns_id'] ?? '',

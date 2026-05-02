@@ -9,4 +9,6 @@ class WebRoutes {
   static const String activationCodes = '/activation-codes';
   static const String sportSettings = '/sports';
   static const String imageList = '/images';
+  static const String appSettings = '/app-settings';
+  static const String colorsScreens = '/colors-screens';
 }
